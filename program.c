@@ -15,6 +15,8 @@ typedef struct data{
   char* uniqueword;
   // files that contains this unique word
   char** files;
+  // this variable will help us to keep track of the files[][]
+  int touchcount;
 }data;
 
 // words[] will hold data elements and will be filled by multiple threads
@@ -33,6 +35,9 @@ char **textfiles;
 
 // this counter will count the amount of txt files are found and will decrement when a txt file is obtained by a thread
 int txtCounter = 0;
+
+// holder for printing purposes
+int totalFileAmount =0;
 
 // this mutex will help us to distribute txt files to threads
 pthread_mutex_t txtfilemutex= PTHREAD_MUTEX_INITIALIZER;
@@ -62,7 +67,7 @@ void processfile(char* filename){
   fprintf(stdout,"MAIN THREAD: Assigned \"%s\" to worker thread %ld.\n",filename,pthread_self());
   
   // buffer that contains file's content
-  char *buffer =0;
+  char *buffer ;
   long content_length;
   char* filePath = malloc(strlen(folderName)*sizeof(char*) +strlen(filename)*sizeof(char*)+1 );
   snprintf(filePath,strlen(folderName)*sizeof(char*) +strlen(filename)*sizeof(char*) ,"%s/%s",folderName,filename);
@@ -99,6 +104,10 @@ void processfile(char* filename){
         // TODO: add file name to the data's file arary
         fprintf(stdout,"The word \"%s\" has already located at index %d.\n",token,index);
         pthread_mutex_lock(&filenamemutex);
+        words[index].files[words[index].touchcount] = malloc((strlen(filename)+1) * sizeof (char*));
+        words[index].files[words[index].touchcount][strlen(filename)] = '\0';
+        strcpy(words[index].files[words[index].touchcount], filename);
+        words[index].touchcount++;
         pthread_mutex_unlock(&filenamemutex);
           continue;
       }else{
@@ -114,6 +123,13 @@ void processfile(char* filename){
           }
           fprintf(stdout,"THREAD %ld: Re-allocated array of %d pointers.\n",pthread_self(),arraysize);
         }
+
+        words[emptywordsindex].files = calloc(totalFileAmount,sizeof(char*));
+        words[emptywordsindex].files[words[emptywordsindex].touchcount] = calloc((strlen(filename)+1) , sizeof (char*));
+        words[emptywordsindex].files[words[emptywordsindex].touchcount][strlen(filename)] = '\0';
+        strcpy(words[emptywordsindex].files[words[emptywordsindex].touchcount], filename);
+        words[emptywordsindex].touchcount++;
+
         words[emptywordsindex].uniqueword = malloc((strlen(token) + 1 )*sizeof(char*));
         words[emptywordsindex].uniqueword[strlen(token)] = '\0';
         strcpy(words[emptywordsindex].uniqueword, token);
@@ -146,6 +162,7 @@ void* threadroutine(void* args){
     pthread_mutex_unlock(&txtfilemutex);
     processfile(filename);
   }
+  fflush(stdout);
   return NULL;
 }
 
@@ -196,7 +213,7 @@ int main(int argc, char *argv[]){
     return 1;
   }
   // holder for printing purposes
-  int totalFileAmount = txtCounter;
+  totalFileAmount = txtCounter;
   // rewind the directory to iterate it again
   rewinddir(dir);
 
@@ -242,6 +259,7 @@ int main(int argc, char *argv[]){
   fprintf(stdout,"MAIN THREAD: All done (succesfully read %d words with %d threads from %d files).\n",emptywordsindex,atoi(argv[4]),totalFileAmount);
 
   // free allocated spaces
+  // actually there is no need to free them since they are global variables and handled by the program itself, but I do it for just in case
   free(textfiles);
   free(folderName);
   free(words);
